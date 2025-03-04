@@ -3,12 +3,18 @@
 import asyncio
 import random
 import yaml
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
 from telethon import TelegramClient, events
 from telethon.errors import FloodWaitError, RPCError
 from telethon.tl.functions.messages import SendReactionRequest
-from telethon.tl.types import ReactionEmoji, InputPeerSelf, PeerUser
+from telethon.tl.types import ReactionEmoji, InputPeerSelf, PeerUser, InputPeerUser
+
+# Global variable to store when the last conversation ended.
+LAST_CONVERSATION_END = None
+
+# Define a minimum delay period (in seconds) before a new conversation can start.
+MIN_DELAY = 60  # adjust as needed
 
 from colorama import Fore, Style, init as colorama_init
 colorama_init(autoreset=True)
@@ -27,7 +33,7 @@ reaction_emojis = [
     "❤️", "👍", "😂", "😎", "🎉", "😍", "🤔", "👏",
     "🔥", "💯", "🤗", "🙌", "😀", "😁", "😉", "😜",
     "🧐", "🥳", "🤯", "😇", "🤓", "🤩", "😅", "😆",
-    "🤠", "😴", "🤤", "🌟", "🎶", "💥", "🍀", "🚀",
+    "🤠", "😴", "💥", "🍀", "🚀", "🙏",
     "🌭", "🍆",
 ]
 
@@ -61,6 +67,7 @@ async def safe_send_message(client: TelegramClient, entity, message: str):
     try:
         return await client.send_message(entity, message)
     except FloodWaitError as e:
+        print(Fore.RED, e, Style.RESET_ALL)
         wait_time = e.seconds + random.randint(1, 5)
         print(Fore.YELLOW + f"[FloodWaitError] Waiting {wait_time}s" + Style.RESET_ALL)
         await asyncio.sleep(wait_time)
@@ -77,6 +84,7 @@ async def safe_forward_message(client: TelegramClient, message):
     try:
         return await message.forward_to(InputPeerSelf())
     except FloodWaitError as e:
+        print(Fore.RED, e, Style.RESET_ALL)
         wait_time = e.seconds + random.randint(1, 5)
         print(Fore.YELLOW + f"[FloodWaitError forwarding] Waiting {wait_time}s" + Style.RESET_ALL)
         await asyncio.sleep(wait_time)
@@ -105,28 +113,39 @@ def maybe_inject_emoji_into_text(text: str, probability: float = 0.25) -> str:
 
 def humanize_text(text: str) -> str:
     if random.random() < 0.3:
-        text = ''.join(ch for ch in text if ch not in '.,!?;:')
-    if random.random() < 0.3 and text:
-        text = text[0].lower() + text[1:]
-    if random.random() < 0.3 and text.endswith('.'):
+        text = ''.join(ch for ch in text if ch not in ';:')
+    if random.random() < 0.25 and text:
+        text = text.lower()
+    if random.random() < 0.5 and text.endswith('.'):
         text = text[:-1]
     return text
 
+
 async def handle_incoming_message(client: TelegramClient, event: events.NewMessage.Event, my_username: str, my_id: int):
+    global LAST_CONVERSATION_END
     try:
         if event.out or not event.is_private:
             return
 
         sender_id = event.sender_id
-        from_user = (await event.get_sender()).username or "UnknownUser"
+        sender = await event.get_sender()
+        from_user = sender.username or "UnknownUser"
         text_received = event.message.message
         print(Fore.BLUE + f"[INCOMING] {my_username} received a PRIVATE message from {from_user}:\n"
               f"       '{text_received}'" + Style.RESET_ALL)
 
-        if CONVERSATION_STATE["active"]:
-            if sender_id not in CONVERSATION_STATE["participants"] or my_id not in CONVERSATION_STATE["participants"]:
+        # Check if the message is a reply to a previous conversation
+        if not CONVERSATION_STATE["active"]:
+            # If it's a reply (or if the last conversation ended recently), ignore it
+            if event.message.reply_to_msg_id:
+                print(Fore.YELLOW + "[INFO] Ignoring reply to a closed conversation" + Style.RESET_ALL)
                 return
-        else:
+            if LAST_CONVERSATION_END:
+                elapsed = (datetime.utcnow() - LAST_CONVERSATION_END).total_seconds()
+                if elapsed < MIN_DELAY:
+                    print(Fore.YELLOW + f"[INFO] New conversation initiation delayed. Only {elapsed:.0f}s passed since last conversation ended." + Style.RESET_ALL)
+                    return
+            # Only then start a new conversation naturally.
             CONVERSATION_STATE["active"] = True
             CONVERSATION_STATE["participants"] = {my_id, sender_id}
             CONVERSATION_STATE["exchanges_left"] = random.randint(5, 10)
@@ -141,10 +160,24 @@ async def handle_incoming_message(client: TelegramClient, event: events.NewMessa
             response_text = await get_response(text_received)
             response_text = maybe_inject_emoji_into_text(response_text, probability=0.3)
             response_text = humanize_text(response_text)
+
+            # Send reply using event.reply (for now)
             print(Fore.GREEN + f"[REPLY] {my_username} -> {from_user}:\n"
                   f"       '{response_text}'" + Style.RESET_ALL)
             await event.reply(response_text)
-            if random.random() <= 0.25:
+            # if reply_type == 'reply':
+            #     print('here1')
+            #     await event.reply(response_text)
+            #     print('here2')
+            # else:
+            #     print('here3')
+            #     input_peer = InputPeerUser(sender.id, sender.access_hash)
+            #     print('here4')
+            #     msg = await safe_send_message(client, input_peer, response_text)
+            #     print('here5')
+            #     print(msg)
+
+            if random.random() <= 0.15:
                 chosen_emoji = random.choice(reaction_emojis)
                 print(Fore.MAGENTA + f"[REACTION] {my_username} reacts with '{chosen_emoji}'" + Style.RESET_ALL)
                 try:
@@ -154,6 +187,7 @@ async def handle_incoming_message(client: TelegramClient, event: events.NewMessa
                         reaction=[ReactionEmoji(emoticon=chosen_emoji)]
                     ))
                 except FloodWaitError as e:
+                    print(Fore.RED, e, Style.RESET_ALL)
                     wait_time = e.seconds + random.randint(1, 5)
                     print(Fore.YELLOW + f"[FloodWaitError reacting] Wait {wait_time}s" + Style.RESET_ALL)
                     await asyncio.sleep(wait_time)
@@ -163,13 +197,16 @@ async def handle_incoming_message(client: TelegramClient, event: events.NewMessa
                 print(Fore.BLUE + "[FORWARD] Forwarding message to Saved Messages" + Style.RESET_ALL)
                 await random_delay()
                 await safe_forward_message(client, event.message)
+
         if CONVERSATION_STATE["exchanges_left"] <= 0:
             print(Fore.GREEN + "[Conversation ended.]" + Style.RESET_ALL)
             CONVERSATION_STATE["active"] = False
             CONVERSATION_STATE["participants"] = set()
             CONVERSATION_STATE["exchanges_left"] = 0
+            LAST_CONVERSATION_END = datetime.utcnow()
     except Exception as e:
         print(Fore.RED + f"[handle_incoming_message Error] {e}" + Style.RESET_ALL)
+
 
 async def random_initiate(clients_info):
     global LAST_INITIATOR

@@ -7,4 +7,5 @@ It automates fake interactions, such as sending messages between bots and mimick
 # TODO
 
 * LLM pre-generated convos
-* support >2 bots
+* break out of convo after a timeout
+* fix dead loops when using direct messages instead of replies
