@@ -34,7 +34,8 @@ def is_night_eu() -> bool:
 
 async def random_delay():
     """Simulate a random human delay from a few seconds to a few minutes."""
-    sleep_time = random.randint(3, 180)
+    #sleep_time = random.randint(3, 180)
+    sleep_time = random.randint(3, 30)
     print(f"Sleeping for %ss" % sleep_time)
     await asyncio.sleep(sleep_time)
 
@@ -52,16 +53,18 @@ async def handle_incoming_message(client: TelegramClient, event: events.NewMessa
     await event.respond(response_text)
 
     # Randomly send a reaction
-    if random.random() < 0.2:
+    #if random.random() < 0.2:
+    if random.random() <= 0.25:
         chosen_emoji = random.choice(reaction_emojis)
         await client(SendReactionRequest(
             peer=event.input_sender,
             msg_id=event.message.id,
-            reaction=[ReactionEmoji(emoji=chosen_emoji)]
+            reaction=[ReactionEmoji(emoticon=chosen_emoji)]
         ))
 
     # Randomly forward to "Saved Messages"
     if random.random() < 0.1:
+        print("Sending to saved")
         await random_delay()
         me = await client.get_me()
         await event.message.forward_to(InputPeerUser(me.id, me.access_hash))
@@ -83,7 +86,8 @@ async def background_chatter(clients_info):
     """Loop forever, occasionally initiate random conversations."""
     while True:
         # Sleep 5 to 15 minutes
-        sleep_time = random.randint(300, 900)
+        # sleep_time = random.randint(300, 900)
+        sleep_time = random.randint(10, 30)
         print(f"Sleeping for %ss" % sleep_time)
         await asyncio.sleep(sleep_time)
 
