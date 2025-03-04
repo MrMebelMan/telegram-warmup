@@ -7,10 +7,4 @@ It automates fake interactions, such as sending messages between bots and mimick
 # TODO
 
 * LLM pre-generated convos
-* fix messing up message order
-* replies
 * support >2 bots
-* catch exceptions properly
-* delay on ratelimits
-* proper colored debug prints
-* fix forwards to saved messages
