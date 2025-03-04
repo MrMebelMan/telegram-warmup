@@ -50,7 +50,7 @@ def is_night_eu() -> bool:
     now_utc = datetime.utcnow().time()
     return (time(23, 0) <= now_utc) or (now_utc < time(6, 0))
 
-async def random_delay(min_sec=3, max_sec=30):
+async def random_delay(min_sec=3, max_sec=60):
     sleep_time = random.randint(min_sec, max_sec)
     print(Fore.CYAN + f"[DELAY] Sleeping for {sleep_time}s" + Style.RESET_ALL)
     await asyncio.sleep(sleep_time)
@@ -135,7 +135,7 @@ async def handle_incoming_message(client: TelegramClient, event: events.NewMessa
             CONVERSATION_STATE["exchanges_left"] -= 1
             await random_delay()
             async with client.action(event.chat_id, 'typing'):
-                await asyncio.sleep(random.uniform(1, 3))
+                await asyncio.sleep(random.uniform(1, 6))
             response_text = await get_response(text_received)
             response_text = maybe_inject_emoji_into_text(response_text, probability=0.3)
             response_text = humanize_text(response_text)
@@ -203,7 +203,7 @@ async def random_initiate(clients_info):
 
 async def background_chatter(clients_info):
     while True:
-        sleep_time = random.randint(10, 30)
+        sleep_time = random.randint(60 * 15, 60 * 60)
         print(Fore.CYAN + f"[background_chatter] Sleeping {sleep_time}s" + Style.RESET_ALL)
         await asyncio.sleep(sleep_time)
         if CONVERSATION_STATE["active"]:
