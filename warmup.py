@@ -89,11 +89,11 @@ async def safe_forward_message(client: TelegramClient, message):
     except Exception as e:
         print(Fore.RED + f"[safe_forward_message] {e}" + Style.RESET_ALL)
 
-def maybe_inject_emoji_into_text(text: str, probability: float = 0.3) -> str:
+def maybe_inject_emoji_into_text(text: str, probability: float = 0.25) -> str:
     # With a given probability, append a random emoji (repeated 1-4 times) at the end of the message.
     if random.random() < probability:
         chosen_emoji = random.choice(reaction_emojis)
-        repeat_count = random.randint(1, 4)
+        repeat_count = random.choice([1, 1, random.randint(1, 4)])
         emoji_str = (chosen_emoji + " ") * repeat_count
         text = text.rstrip()  # Remove trailing whitespace
         # If text ends with sentence-ending punctuation, leave it and append emoji after a space.
